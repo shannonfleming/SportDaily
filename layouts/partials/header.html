@@ -1,0 +1,86 @@
+<header class="bg-gray-900 border-b-4 border-red-600 sticky top-0 z-50">
+    
+    <!-- Top Bar (Simple) -->
+    <div class="bg-black text-gray-400 text-[10px] py-1 hidden md:block border-b border-gray-800">
+        <div class="container mx-auto px-4 flex justify-between">
+            <span>{{ now.Format "Mon, Jan 02, 2006" }}</span>
+            <span class="font-bold tracking-wider">Sport DAILY</span>
+        </div>
+    </div>
+
+    <!-- Main Header -->
+    <div class="container mx-auto px-4 h-16 md:h-20 flex items-center justify-between relative bg-gray-900">
+        
+        <!-- Logo -->
+        <a href="/" class="flex items-center gap-2 group shrink-0" aria-label="Homepage">
+            <div class="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center group-hover:border-red-600 transition">
+                <div class="w-2 h-2 bg-white rounded-full group-hover:bg-red-600 transition"></div>
+            </div>
+            <span class="font-display font-black text-xl tracking-tighter text-white">
+                Sport<span class="font-light text-gray-400">DAILY</span>
+            </span>
+        </a>
+
+        <!-- Desktop Menu (Optimized Dropdown) -->
+        <nav class="hidden lg:flex items-center gap-6">
+            <a href="/" class="text-sm font-bold text-gray-300 hover:text-white uppercase tracking-wide transition">Home</a>
+
+            <!-- Dropdown: Competitions -->
+            <div class="relative group py-6">
+                <button class="flex items-center gap-1 text-sm font-bold text-gray-300 group-hover:text-white uppercase tracking-wide cursor-pointer focus:outline-none">
+                    Leagues <span class="text-[10px]">▼</span>
+                </button>
+                <div class="absolute left-0 top-full w-48 bg-gray-900 border-t-2 border-red-600 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-1 group-hover:translate-y-0">
+                    <a href="/categories/premier-league" class="block px-4 py-3 text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 border-b border-gray-800">Premier League</a>
+                    <a href="/categories/champions-league" class="block px-4 py-3 text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 border-b border-gray-800">Champions League</a>
+                    <a href="/categories/la-liga" class="block px-4 py-3 text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800">La Liga</a>
+                </div>
+            </div>
+
+            <!-- Dropdown: News -->
+            <div class="relative group py-6">
+                <button class="flex items-center gap-1 text-sm font-bold text-gray-300 group-hover:text-white uppercase tracking-wide cursor-pointer focus:outline-none">
+                    News <span class="text-[10px]">▼</span>
+                </button>
+                <div class="absolute left-0 top-full w-48 bg-gray-900 border-t-2 border-red-600 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-1 group-hover:translate-y-0">
+                    <a href="/categories/transfer-news" class="block px-4 py-3 text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 border-b border-gray-800">Transfer News</a>
+                    <a href="/categories/international" class="block px-4 py-3 text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800">International</a>
+                </div>
+            </div>
+
+            <a href="/categories/tactical-analysis" class="text-sm font-bold text-gray-300 hover:text-white uppercase tracking-wide transition">Analysis</a>
+        </nav>
+
+        <!-- Right Side -->
+        <div class="flex items-center gap-4">
+            <a href="https://wwp.ailooe.com/redirect-zone/058f7788" target="_blank" rel="nofollow noopener noreferrer" class="bg-white px-4 py-1 rounded-full text-xs font-black uppercase text-gray-900 hover:bg-red-600 hover:text-white transition shadow-lg flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span> Live
+            </a>
+            
+            <!-- Mobile Toggle -->
+            <button id="mobile-menu-btn" aria-label="Menu" class="lg:hidden text-white focus:outline-none">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Mobile Menu (Hidden by default using style to prevent FOUC) -->
+    <div id="mobile-menu" class="hidden lg:hidden bg-gray-900 border-t border-gray-800">
+        <nav class="flex flex-col p-4 space-y-1">
+            <a href="/" class="block px-4 py-2 text-sm font-bold text-white uppercase">Home</a>
+            <div class="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase">Leagues</div>
+            <a href="/categories/premier-league" class="block px-6 py-2 text-sm text-gray-400 hover:text-white">Premier League</a>
+            <a href="/categories/champions-league" class="block px-6 py-2 text-sm text-gray-400 hover:text-white">Champions League</a>
+            <div class="px-4 py-2 text-[10px] font-bold text-gray-500 uppercase">Updates</div>
+            <a href="/categories/transfer-news" class="block px-6 py-2 text-sm text-gray-400 hover:text-white">Transfers</a>
+            <a href="/categories/tactical-analysis" class="block px-6 py-2 text-sm text-gray-400 hover:text-white">Analysis</a>
+        </nav>
+    </div>
+
+    <script>
+        // Simple Vanilla JS toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+    </script>
+</header>

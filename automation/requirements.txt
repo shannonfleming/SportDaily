@@ -1,0 +1,7 @@
+requests
+feedparser
+python-slugify
+Pillow
+groq
+oauth2client
+google-api-python-client

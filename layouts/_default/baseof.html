@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="{{ .Site.LanguageCode | default "en" }}" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    
+    <!-- 1. PRECONNECT & PRELOAD (CRITICAL PERFORMANCE) -->
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://s10.histats.com">
+    <!-- Preload Tailwind Script agar tidak render blocking -->
+    <link rel="preload" href="https://cdn.tailwindcss.com?plugins=typography,line-clamp" as="script">
+
+    <!-- 2. SEO TITLE (Rapi tanpa Spasi Berlebih) -->
+    <title>{{ if .IsHome }}{{ .Site.Title }} - Breaking Football News, Transfers & Tactical Analysis{{ else }}{{ .Title }} | {{ .Site.Title }}{{ end }}</title>
+
+    <!-- 3. META DESCRIPTION (SAFE MODE) -->
+    <!-- 'plainify' membuang tag HTML, 'htmlUnescape' membersihkan karakter aneh -->
+    <meta name="description" content="{{ if .IsHome }}{{ .Site.Params.description }}{{ else }}{{ .Params.description | default .Summary | plainify | htmlUnescape }}{{ end }}">
+
+    <link rel="canonical" href="{{ .Permalink }}">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="theme-color" content="#111827">
+
+    <!-- 4. TAILWIND & FONTS -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography,line-clamp"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Roboto', 'sans-serif'],
+                        display: ['Libre Franklin', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@300;400;500;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@300;400;500;700;900&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet"></noscript>
+
+    <!-- 5. OPEN GRAPH (FB/WA) -->
+    <meta property="og:locale" content="{{ .Site.LanguageCode | default "en_GB" }}">
+    <meta property="og:site_name" content="{{ .Site.Title }}">
+    <meta property="og:type" content="{{ if .IsPage }}article{{ else }}website{{ end }}">
+    <meta property="og:title" content="{{ if .IsHome }}{{ .Site.Title }} - Football News & Analysis{{ else }}{{ .Title }}{{ end }}">
+    <meta property="og:description" content="{{ if .IsHome }}{{ .Site.Params.description }}{{ else }}{{ .Params.description | default .Summary | plainify | htmlUnescape }}{{ end }}">
+    <meta property="og:url" content="{{ .Permalink }}">
+    
+    {{ if .Params.featured_image }}
+    <meta property="og:image" content="{{ .Params.featured_image | absURL }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="675">
+    {{ else }}
+    <meta property="og:image" content="{{ "images/default-football.jpg" | absURL }}">
+    {{ end }}
+
+    <!-- 6. TWITTER CARDS -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ .Title }}">
+    <meta name="twitter:description" content="{{ if .IsHome }}{{ .Site.Params.description }}{{ else }}{{ .Params.description | default .Summary | plainify | htmlUnescape }}{{ end }}">
+    {{ if .Params.featured_image }}
+    <meta name="twitter:image" content="{{ .Params.featured_image | absURL }}">
+    {{ else }}
+    <meta name="twitter:image" content="{{ "images/default-football.jpg" | absURL }}">
+    {{ end }}
+
+    <!-- =======================================================
+         7. SCHEMA.ORG (JSON-LD)
+         ======================================================= -->
+    
+    <!-- A. Homepage Schema -->
+    {{ if .IsHome }}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Sport Daily",
+      "alternateName": ["SportDaily", "Sport Daily News"],
+      "url": "{{ .Site.BaseURL }}",
+      "description": "{{ .Site.Params.description }}",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Sport Daily",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "{{ "favicon.svg" | absURL }}"
+        }
+      }
+    }
+    </script>
+    {{ end }}
+
+    <!-- B. Article Schema -->
+    {{ if .IsPage }}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "NewsArticle",
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "{{ .Permalink }}"
+      },
+      "headline": "{{ .Title }}",
+      "image": [ "{{ .Params.featured_image | absURL }}" ],
+      "datePublished": "{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}",
+      "dateModified": "{{ .Lastmod.Format "2006-01-02T15:04:05Z07:00" }}",
+      "author": {
+        "@type": "Person",
+        "name": "{{ .Params.author | default "Sport Daily Team" }}"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "{{ .Site.Title }}",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "{{ "favicon.svg" | absURL }}" 
+        }
+      },
+      "description": "{{ .Params.description | default .Summary | plainify | htmlUnescape }}"
+    }
+    </script>
+    {{ end }}
+
+    <link rel="icon" href="{{ "favicon.svg" | absURL }}" type="image/svg+xml">
+    
+</head>
+<body class="bg-white text-news-dark font-sans antialiased flex flex-col min-h-screen">
+    {{ partial "header.html" . }}
+    <main id="main-content" role="main" class="flex-grow">
+        {{ block "main" . }}{{ end }}
+    </main>
+    {{ partial "footer.html" . }}
+</body>
+</html>

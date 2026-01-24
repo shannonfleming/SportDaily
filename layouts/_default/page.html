@@ -1,0 +1,22 @@
+{{ define "main" }}
+<div class="container mx-auto px-4 py-12 max-w-4xl">
+    
+    <!-- Header Halaman (Clean) -->
+    <header class="mb-10 text-center border-b border-gray-200 pb-8">
+        <h1 class="font-display font-black text-4xl md:text-5xl text-gray-900 mb-4 uppercase tracking-tight">
+            {{ .Title }}
+        </h1>
+        <p class="text-gray-500 text-lg font-medium italic">
+            {{ .Description }}
+        </p>
+    </header>
+
+    <!-- Konten Halaman (Legal/Text Style) -->
+    <article class="prose prose-lg prose-red max-w-none 
+                    prose-headings:font-bold prose-headings:text-gray-900 
+                    prose-p:text-gray-700 prose-li:text-gray-700">
+        {{ .Content }}
+    </article>
+
+</div>
+{{ end }}
