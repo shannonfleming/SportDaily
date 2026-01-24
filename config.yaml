@@ -1,0 +1,44 @@
+baseURL: "https://Sportdaily-alpha.vercel.app/"
+languageCode: "en-us"
+title: "Sport Daily"
+canonifyURLs: true
+
+permalinks:
+  articles: "/:slug/"
+
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
+
+outputs:
+  home:
+    - HTML
+    - RSS
+    - Sitemap
+  page:
+    - HTML
+  section:
+    - HTML
+    - RSS
+  taxonomy:
+    - HTML
+    - RSS
+  term:
+    - HTML
+    - RSS
+
+services:
+  rss:
+    limit: 50
+
+taxonomies:
+  category: "categories"
+  tag: "tags"
+
+params:
+  description: "Your #1 source for breaking football news, live scores, transfer rumors (Fabrizio Romano), and tactical analysis for Premier League, La Liga, & Champions League."
+  defaultImage: "/images/default-football.jpg"
+  author:
+    name: "Sport Daily Team"
+    email: "contact@Sportdaily.com"
