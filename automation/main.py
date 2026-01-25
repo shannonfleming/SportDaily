@@ -39,6 +39,7 @@ AUTHOR_PROFILES = [
 ]
 
 # --- TARGET GEOS ---
+# Prioritas negara untuk dicek
 TARGET_GEOS = ["US", "GB", "NG", "ZA", "IE", "AU", "ES", "IT", "BR"]
 
 # --- CONTENT CONFIG ---
@@ -48,15 +49,13 @@ DATA_DIR = "automation/data"
 MEMORY_FILE = f"{DATA_DIR}/link_memory.json"
 TARGET_TOTAL_ARTICLES = 5 
 
-# --- BROWSER HEADERS (PENYAMARAN) ---
-# Ini wajib agar tidak diblokir Google
+# --- BROWSER HEADERS ---
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0"
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
 ]
 
-# --- MASSIVE KEYWORD DATABASE (FILTER) ---
+# --- MASSIVE KEYWORD DATABASE (Backup Filter) ---
 SPORTS_KEYWORDS = [
     "football", "soccer", "sport", "league", "cup", "game", "match", "vs", "score",
     "result", "highlights", "table", "fixture", "transfer", "injury", "manager",
@@ -105,67 +104,80 @@ def get_formatted_internal_links():
     if len(items) > 3: items = random.sample(items, 3)
     return "\n".join([f"* [{t}]({u})" for t, u in items])
 
-# --- CRITICAL UPDATE: ROBUST TRENDS FETCHER ---
+# --- 🔥 NEW: GOOGLE TRENDS JSON API FETCHER 🔥 ---
 def fetch_google_trends(geo="US"):
     """
-    Mengambil RSS dengan header browser asli agar tidak diblokir.
-    Menggunakan strategi 'Double Tap': Coba Sports -> Jika gagal, Coba General + Filter.
+    Menggunakan JSON Endpoint API Resmi Google Trends.
+    Menggantikan RSS yang sudah mati (404).
+    Mendukung filter category sports (cat=s).
     """
+    # Endpoint resmi API (Hidden API)
+    url = "https://trends.google.com/trends/api/dailytrends"
     
-    # 1. URL Target
-    url_sports = f"https://trends.google.com/trends/trendingsearches/daily/rss?geo={geo}&cat=s"
-    url_general = f"https://trends.google.com/trends/trendingsearches/daily/rss?geo={geo}"
+    # Parameter query string
+    params = {
+        "hl": "en-US",
+        "tz": "0",       # Timezone UTC
+        "geo": geo,      # Kode negara
+        "cat": "s",      # s = Sports (PENTING!)
+        "ns": "15"       # Ambil 15 trend teratas
+    }
     
     headers = {
         'User-Agent': random.choice(USER_AGENTS),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://trends.google.com/trends/trendingsearches/daily?geo=' + geo,
     }
 
-    def get_feed_entries(target_url):
-        try:
-            print(f"      📡 Requesting: {target_url} ...")
-            # REQUEST PENTING: Gunakan requests.get DULUAN, bukan feedparser langsung
-            resp = requests.get(target_url, headers=headers, timeout=10)
-            
-            if resp.status_code != 200:
-                print(f"      ⚠️ Status Code: {resp.status_code} (Blocked/Error)")
-                return []
-            
-            # Parsing konten text dari requests
-            feed = feedparser.parse(resp.content)
-            return feed.entries if feed.entries else []
-        except Exception as e:
-            print(f"      ❌ Connection Error: {e}")
-            return []
-
-    # --- STRATEGI 1: Coba Kategori Sports Langsung ---
-    print(f"   🔎 [Attempt 1] Scanning 'Sports' Category in {geo}...")
-    entries = get_feed_entries(url_sports)
+    print(f"   🔎 Scanning 'Sports' API for Region: {geo}...")
     
-    final_trends = []
-
-    if entries:
-        print(f"      ✅ Sports Feed Found! ({len(entries)} items)")
-        # Ambil semua karena ini sudah pasti folder sports
-        final_trends = [e.title for e in entries]
-    else:
-        # --- STRATEGI 2: Fallback ke General & Filter Manual ---
-        print(f"      ⚠️ Sports feed empty via API. Switching to [Attempt 2] General Feed + Filter...")
-        entries = get_feed_entries(url_general)
+    try:
+        # Request ke Google
+        response = requests.get(url, params=params, headers=headers, timeout=10)
         
-        if entries:
-            print(f"      ✅ General Feed Found ({len(entries)} items). Filtering for sports...")
-            for e in entries:
-                # Debug: Tampilkan apa yang sedang dicek
-                # print(f"         Checking: {e.title}") 
-                if any(k in e.title.lower() for k in SPORTS_KEYWORDS):
-                    print(f"         🎯 MATCH FOUND: {e.title}")
-                    final_trends.append(e.title)
-    
-    return final_trends
+        if response.status_code != 200:
+            print(f"      ⚠️ Status Code: {response.status_code} (Mungkin negara tidak support daily trends)")
+            return []
+            
+        # Google API mengembalikan "Magic Prefix" di awal respon: ")]}',"
+        # Kita harus hapus 5 karakter pertama agar jadi JSON valid
+        content = response.text[5:] 
+        
+        data = json.loads(content)
+        
+        # Parsing struktur JSON Google
+        # default -> trendingSearchesDays -> [0] -> trendingSearches
+        days = data.get("default", {}).get("trendingSearchesDays", [])
+        
+        if not days:
+            print("      ⚠️ JSON structure mismatch or empty.")
+            return []
+            
+        # Ambil hari ini (index 0)
+        todays_trends = days[0].get("trendingSearches", [])
+        
+        trends_found = []
+        
+        print(f"      ✅ API Success! Found {len(todays_trends)} items.")
+        
+        for item in todays_trends:
+            # Ambil judul trend (Query)
+            query = item.get("title", {}).get("query", "")
+            
+            if query:
+                # Karena kita sudah pakai cat=s, seharusnya ini sudah olahraga semua.
+                # Tapi kita cek lagi pakai SPORTS_KEYWORDS untuk memastikan kualitas.
+                # Atau kita bisa langsung ambil saja karena API Google cukup akurat.
+                
+                # Kita log apa saja yang ditemukan
+                # print(f"         Found: {query}")
+                trends_found.append(query)
+                
+        return trends_found
+
+    except Exception as e:
+        print(f"      ❌ API Error: {e}")
+        return []
 
 def fetch_news_context(keyword):
     """
@@ -174,7 +186,7 @@ def fetch_news_context(keyword):
     encoded = requests.utils.quote(f"{keyword} news")
     url = f"https://news.google.com/rss/search?q={encoded}&hl=en-US&gl=US&ceid=US:en"
     
-    headers = {'User-Agent': random.choice(USER_AGENTS)} # Pakai header acak juga di sini
+    headers = {'User-Agent': random.choice(USER_AGENTS)} 
     
     try:
         r = requests.get(url, headers=headers, timeout=15)
@@ -328,17 +340,19 @@ def main():
     generated_count = 0
     seen_trends = set() 
     
-    print("\n🔥 STARTING SPORTS TRENDS AUTOMATION (UNBLOCKED VERSION) 🔥")
+    print("\n🔥 STARTING SPORTS TRENDS AUTOMATION (API JSON MODE) 🔥")
     print(f"🎯 Target: {TARGET_TOTAL_ARTICLES} articles.")
     
     for geo_code in TARGET_GEOS:
         if generated_count >= TARGET_TOTAL_ARTICLES: break
             
         print(f"\n🌍 Switching to Region: {geo_code}...")
+        
+        # 🟢 PANGGIL API JSON
         trends = fetch_google_trends(geo=geo_code)
         
         if not trends:
-            print(f"   ⚠️ No valid sport trends found in {geo_code} after all attempts.")
+            print(f"   ⚠️ No sports data in {geo_code} via API.")
             continue
         
         for trend_keyword in trends:
