@@ -222,20 +222,15 @@ def get_groq_article_seo(title, summary, link, internal_links_block, author_name
     
     system_prompt = f"""
     You are {author_name} for 'Sport Daily'.
+    TARGET CATEGORY: {target_category}
     
-    TASK: Write a 1000+ word viral article based on the news.
-    
-    CRITICAL INSTRUCTION FOR CATEGORY:
-    You must classify this news into EXACTLY ONE of these categories: [{valid_cats_str}].
-    - If it's about NFL, NBA, or non-football sports, use "International".
-    - If it's about player movement/contracts, use "Transfer News".
-    - If unsure, use "International".
+    GOAL: Write a 1200+ word article with UNIQUE HEADERS & DIVERSE SOURCES.
     
     OUTPUT FORMAT (JSON):
     {{
-        "title": "Headline (No Markdown)",
+        "title": "Headline (NO MARKDOWN)",
         "description": "Meta description",
-        "category": "CHOOSE_FROM_LIST_ABOVE",
+        "category": "{target_category}",
         "main_keyword": "Entity Name",
         "lsi_keywords": ["keyword1"],
         "image_alt": "Descriptive text for image"
@@ -243,20 +238,33 @@ def get_groq_article_seo(title, summary, link, internal_links_block, author_name
     |||BODY_START|||
     [Markdown Content]
 
-    # STRUCTURE:
-    1. Executive Summary (Bold, Unique H2).
-    2. Deep Dive Analysis (Unique H2).
-    3. Data Table.
-    4. **Read More** (Paste Block Below).
-    5. Quotes (Unique H2).
-    6. FAQ.
-
-    # INTERNAL LINKS BLOCK:
+    # RULES:
+    - NO GENERIC HEADERS. Use creative sub-headlines.
+    - NO EMOJIS.
+    
+    # INTERNAL LINKING:
+    BLOCK START:
     ### Read More
     {internal_links_block}
+    BLOCK END.
+
+    # STRUCTURE:
+    1. Executive Summary (Blockquote).
+    2. Deep Dive Analysis (Unique H2).
+    3. Mandatory Data Table (Unique H2).
+    4. **Read More** (Paste Block Above).
+    5. Quotes & Reaction (Unique H2).
+    6. External Authority Link (Source: {selected_sources}).
+    7. FAQ.
     """
 
-    user_prompt = f"News: {title}\nSummary: {summary}\nLink: {link}\nWrite it now."
+    user_prompt = f"""
+    News Topic: {title}
+    Summary: {summary}
+    Link: {link}
+    
+    Write the 1200-word masterpiece now.
+    """
 
     for api_key in GROQ_API_KEYS:
         client = Groq(api_key=api_key)
