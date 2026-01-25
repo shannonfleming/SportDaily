@@ -41,7 +41,6 @@ AUTHOR_PROFILES = [
 ]
 
 # --- 🟢 DAFTAR KATEGORI RESMI WEBSITE ANDA ---
-# AI dipaksa memilih salah satu dari ini. Tidak boleh bikin baru.
 VALID_CATEGORIES = [
     "Transfer News", 
     "Premier League", 
@@ -52,7 +51,6 @@ VALID_CATEGORIES = [
 ]
 
 # --- 🟢 SUMBER RSS (US & UK) ---
-# Ini hanya sumber data, bukan nama kategori.
 RSS_SOURCES = {
     "US Source": "https://news.google.com/rss/headlines/section/topic/SPORTS?hl=en-US&gl=US&ceid=US:en",
     "UK Source": "https://news.google.com/rss/headlines/section/topic/SPORTS?hl=en-GB&gl=GB&ceid=GB:en"
@@ -75,7 +73,7 @@ IMAGE_DIR = "static/images"
 DATA_DIR = "automation/data"
 MEMORY_FILE = f"{DATA_DIR}/link_memory.json"
 
-TARGET_PER_SOURCE = 3 # Ambil 3 artikel dari US, 3 dari UK
+TARGET_PER_SOURCE = 3 
 
 # --- MEMORY SYSTEM ---
 def load_link_memory():
@@ -190,7 +188,7 @@ def submit_to_indexnow(url):
         print(f"      🚀 IndexNow Submitted")
     except: pass
 
-# --- AI WRITER ENGINE (UPDATED TO FIX CATEGORY) ---
+# --- AI WRITER ENGINE (UPDATED: UNIQUE HEADERS) ---
 def parse_ai_response(text, fallback_title, fallback_desc):
     try:
         parts = text.split("|||BODY_START|||")
@@ -209,28 +207,37 @@ def parse_ai_response(text, fallback_title, fallback_desc):
         "title": clean_text(fallback_title),
         "description": clean_text(fallback_desc),
         "image_alt": clean_text(fallback_title),
-        "category": "International", # Default Safe Fallback
+        "category": "International", 
         "main_keyword": "Football",
         "lsi_keywords": [],
         "content": clean_body
     }
 
 def get_groq_article_seo(title, summary, link, internal_links_block, author_name):
-    # Kita berikan daftar kategori ke AI agar dia yang memilih
     valid_cats_str = ", ".join(VALID_CATEGORIES)
-    selected_sources = ", ".join(random.sample(AUTHORITY_SOURCES, 3))
     
+    # --- 🟢 PERBAIKAN PROMPT UNTUK HEADER UNIK ---
     system_prompt = f"""
     You are {author_name} for 'Sport Daily'.
-    TARGET CATEGORY: {target_category}
     
-    GOAL: Write a 1200+ word article with UNIQUE HEADERS & DIVERSE SOURCES.
+    TASK: Write a 1000+ word viral article based on the news.
+    
+    # CRITICAL INSTRUCTION FOR HEADERS (H2/H3):
+    - **NEVER** use generic headers like "Analysis", "Deep Dive", "Conclusion", "Summary", "Introduction".
+    - **ALWAYS** write unique, catchy headers that include specific Player Names, Team Names, or Action Verbs.
+    - Example BAD: "## Tactical Analysis"
+    - Example GOOD: "## How Mbappe's Speed Dismantled the Defense"
+    
+    # CRITICAL INSTRUCTION FOR CATEGORY:
+    You must classify this news into EXACTLY ONE of these categories: [{valid_cats_str}].
+    - If it's about NFL, NBA, or non-football sports, use "International".
+    - If it's about player movement/contracts, use "Transfer News".
     
     OUTPUT FORMAT (JSON):
     {{
-        "title": "Headline (NO MARKDOWN)",
+        "title": "Headline (No Markdown)",
         "description": "Meta description",
-        "category": "{target_category}",
+        "category": "CHOOSE_FROM_LIST_ABOVE",
         "main_keyword": "Entity Name",
         "lsi_keywords": ["keyword1"],
         "image_alt": "Descriptive text for image"
@@ -238,45 +245,33 @@ def get_groq_article_seo(title, summary, link, internal_links_block, author_name
     |||BODY_START|||
     [Markdown Content]
 
-    # RULES:
-    - NO GENERIC HEADERS. Use creative sub-headlines.
-    - NO EMOJIS.
-    
-    # INTERNAL LINKING:
-    BLOCK START:
+    # STRUCTURE:
+    1. Executive Summary.
+    2. [Unique H2: Context of the Story].
+    3. [Unique H2: Key Stats/Data Table] (Markdown Table).
+    4. **Read More** (Paste Block Below).
+    5. [Unique H2: Quotes & Reactions].
+    6. FAQ (Questions must be specific to the topic).
+
+    # INTERNAL LINKS BLOCK:
     ### Read More
     {internal_links_block}
-    BLOCK END.
-
-    # STRUCTURE:
-    1. Executive Summary (Blockquote).
-    2. Deep Dive Analysis (Unique H2).
-    3. Mandatory Data Table (Unique H2).
-    4. **Read More** (Paste Block Above).
-    5. Quotes & Reaction (Unique H2).
-    6. External Authority Link (Source: {selected_sources}).
-    7. FAQ.
     """
 
-    user_prompt = f"""
-    News Topic: {title}
-    Summary: {summary}
-    Link: {link}
-    
-    Write the 1200-word masterpiece now.
-    """
+    user_prompt = f"News: {title}\nSummary: {summary}\nLink: {link}\nWrite it now."
 
     for api_key in GROQ_API_KEYS:
         client = Groq(api_key=api_key)
         try:
-            print(f"      🤖 AI Writing (Auto-Categorizing)...")
+            print(f"      🤖 AI Writing (Unique Headers & Categorizing)...")
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.75, max_tokens=7500,
+                temperature=0.8, # Sedikit dinaikkan agar lebih kreatif judulnya
+                max_tokens=7500,
             )
             return completion.choices[0].message.content
         except RateLimitError: continue
@@ -292,7 +287,6 @@ def main():
 
     total_generated = 0
 
-    # Loop berdasarkan RSS_SOURCES (US & UK)
     for source_name, rss_url in RSS_SOURCES.items():
         print(f"\n📡 Fetching Source: {source_name}...")
         feed = fetch_rss_feed(rss_url)
@@ -313,7 +307,6 @@ def main():
             
             links_block = get_formatted_internal_links()
             
-            # Panggil AI tanpa 'category_name' (AI yang akan menentukan)
             raw_response = get_groq_article_seo(clean_title, entry.summary, entry.link, links_block, current_author)
             
             if not raw_response: continue
@@ -321,7 +314,6 @@ def main():
             data = parse_ai_response(raw_response, clean_title, entry.summary)
             if not data: continue
 
-            # Validasi Akhir Kategori (Jaga-jaga jika AI halusinasi)
             if data['category'] not in VALID_CATEGORIES:
                 data['category'] = "International"
 
@@ -359,7 +351,6 @@ draft: false
             
             print(f"   ✅ Published: {filename} (Category: {data['category']})")
             
-            # Indexing
             full_url = f"{WEBSITE_URL}/{slug}/"
             submit_to_indexnow(full_url)
             submit_to_google(full_url)
