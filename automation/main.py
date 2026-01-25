@@ -38,16 +38,16 @@ AUTHOR_PROFILES = [
     "Elena Petrova (Tactical Expert)", "Ben Foster (Sports Journalist)"
 ]
 
+# --- TARGET GEOS (URUTAN PRIORITAS) ---
+# Bot akan mengecek tab SPORTS di negara-negara ini secara berurutan
+# US ditaruh awal karena screenshot Anda menunjukkan US sedang ramai
+TARGET_GEOS = ["US", "GB", "NG", "ZA", "IE", "AU", "ES", "IT", "BR"]
+
 # --- AUTHORITY SOURCES ---
 AUTHORITY_SOURCES = [
     "Transfermarkt", "Sky Sports", "The Athletic", "Opta Analyst",
     "WhoScored", "BBC Sport", "The Guardian", "UEFA Official", "ESPN FC"
 ]
-
-# --- TARGET GEOS (URUTAN PRIORITAS) ---
-# Bot akan mengecek urut dari kiri ke kanan sampai target terpenuhi
-# GB: Inggris, US: Amerika, NG: Nigeria (Bola hype tinggi), ZA: South Africa, IE: Ireland, AU: Australia
-TARGET_GEOS = ["GB", "US", "NG", "ZA", "IE", "AU"]
 
 # --- FALLBACK IMAGES ---
 FALLBACK_IMAGES = [
@@ -60,17 +60,36 @@ IMAGE_DIR = "static/images"
 DATA_DIR = "automation/data"
 MEMORY_FILE = f"{DATA_DIR}/link_memory.json"
 
-TARGET_TOTAL_ARTICLES = 5 # Total artikel yg diinginkan per run
+TARGET_TOTAL_ARTICLES = 5 
 
-# --- FILTER KEYWORDS ---
+# --- MASSIVE KEYWORD DATABASE ---
+# Berfungsi menangkap judul seperti "Villarreal - Real Madrid" yang tidak ada kata "Football"-nya
 SPORTS_KEYWORDS = [
-    "football", "soccer", "premier league", "champions league", "manchester", 
-    "liverpool", "arsenal", "chelsea", "madrid", "barcelona", "bayern", 
-    "juventus", "ronaldo", "messi", "fifa", "uefa", "transfer", "cup", 
-    "league", "sport", "coach", "manager", "vs", "score", "tottenham", 
-    "united", "city", "villa", "newcastle", "mbappe", "bellingham", "klopp",
-    "pep", "arteta", "ten hag", "pochetino", "mourinho", "world cup", "euro",
-    "super bowl", "nfl" # Tambahan jika ingin sport umum US, hapus jika khusus bola kaki
+    # GENERAL TERMS
+    "football", "soccer", "sport", "league", "cup", "game", "match", "vs", "score",
+    "result", "highlights", "table", "fixture", "transfer", "injury", "manager",
+    "ufc", "mma", "nba", "basketball", "nfl", "f1", "formula 1", "moto gp", "boxing",
+    
+    # LEAGUES & EVENTS
+    "premier league", "champions league", "europa", "la liga", "serie a", "bundesliga", 
+    "ligue 1", "mls", "fifa", "uefa", "fa cup", "carabao", "copa america", "euro 2024", 
+    "world cup", "afcon", "libertadores", "super bowl", "playoffs",
+    
+    # CLUBS (European Giants + EPL)
+    "arsenal", "aston villa", "bournemouth", "brentford", "brighton", "chelsea",
+    "crystal palace", "everton", "fulham", "liverpool", "luton", "man city", 
+    "manchester city", "man utd", "manchester united", "newcastle", "nottingham",
+    "sheffield", "tottenham", "spurs", "west ham", "wolves", "leicester", "leeds",
+    "real madrid", "barcelona", "atletico", "girona", "villarreal", "sevilla",
+    "bayern", "dortmund", "leverkusen", "juventus", "milan", "inter", "roma", "napoli", 
+    "psg", "ajax", "benfica", "porto", "sporting", "celtic", "rangers", "miami", 
+    "al nassr", "al hilal", "knicks", "76ers", "lakers", "warriors", "chiefs", "49ers",
+    
+    # PLAYERS & FIGHTERS (Visible in your screenshot)
+    "paddy pimblett", "pimblett", "mcgregor", "jon jones", "ngannou",
+    "messi", "ronaldo", "mbappe", "haaland", "bellingham", "kane", "salah", "debruyne",
+    "saka", "rice", "foden", "vinicius", "rodrygo", "yamal", "lewandowski", "neymar",
+    "mike mccarthy", "dak prescott", "lebron", "curry"
 ]
 
 # --- MEMORY SYSTEM ---
@@ -84,8 +103,7 @@ def save_link_to_memory(title, slug):
     os.makedirs(DATA_DIR, exist_ok=True)
     memory = load_link_memory()
     memory[title] = f"/{slug}"
-    if len(memory) > 50:
-        memory = dict(list(memory.items())[-50:])
+    if len(memory) > 50: memory = dict(list(memory.items())[-50:])
     with open(MEMORY_FILE, 'w') as f: json.dump(memory, f, indent=2)
 
 def get_formatted_internal_links():
@@ -96,31 +114,54 @@ def get_formatted_internal_links():
     return "\n".join([f"* [{t}]({u})" for t, u in items])
 
 # --- FETCHERS ---
-def fetch_google_trends(geo="GB"):
+def fetch_google_trends(geo="US"):
     """
-    Mengambil RSS Trends berdasarkan kode negara (GEO)
+    Mengambil RSS khusus kategori SPORTS (cat=s).
+    Ini sesuai dengan screenshot dropdown 'Sports' Anda.
     """
-    rss_url = f"https://trends.google.com/trends/trendingsearches/daily/rss?geo={geo}"
-    print(f"   📡 Scanning Google Trends Region: {geo}...")
+    # PERHATIKAN: &cat=s adalah kuncinya!
+    rss_url = f"https://trends.google.com/trends/trendingsearches/daily/rss?geo={geo}&cat=s"
+    print(f"   📡 Scanning Google Trends (Category: Sports) Region: {geo}...")
+    
     try:
         feed = feedparser.parse(rss_url)
         trends = []
+        
+        # DEBUG: Lihat apa yang ditemukan Google
+        if feed.entries:
+            # Ambil 3 teratas untuk pengecekan di terminal
+            top_3 = [e.title for e in feed.entries[:3]]
+            print(f"      [DEBUG] Top 3 Sports in {geo}: {top_3}")
+        else:
+            print(f"      [WARNING] Feed kosong atau diblokir di {geo}.")
+
         if feed.entries:
             for entry in feed.entries:
-                # Cek apakah keyword mengandung unsur olahraga
-                if any(k in entry.title.lower() for k in SPORTS_KEYWORDS):
+                title_lower = entry.title.lower()
+                
+                # Filter Keyword (Opsional, tapi bagus untuk memastikan relevansi)
+                # Karena kita sudah pakai cat=s, harusnya isinya sudah olahraga semua.
+                # Tapi kita cek lagi agar 'safe'.
+                if any(k in title_lower for k in SPORTS_KEYWORDS):
                     trends.append(entry.title)
+                else:
+                    # Jika judulnya aneh tapi masuk kategori sports, kita masukkan juga
+                    # tapi beri log
+                    print(f"      ❓ Found potential sport trend (checking content later): {entry.title}")
+                    trends.append(entry.title)
+                    
         return trends
-    except: return []
+    except Exception as e: 
+        print(f"      [ERROR] Feed Parse Error: {e}")
+        return []
 
 def fetch_news_context(keyword):
     """
-    Mencari konteks berita di Google News Global (English)
-    agar relevan dengan keyword dari negara manapun.
+    Mencari konteks berita di Google News Global
     """
-    encoded = requests.utils.quote(f"{keyword} football news")
-    # Tetap gunakan hl=en-GB untuk output bahasa Inggris yang rapi
-    url = f"https://news.google.com/rss/search?q={encoded}&hl=en-GB&gl=GB&ceid=GB:en"
+    encoded = requests.utils.quote(f"{keyword} news")
+    # Menggunakan gl=US (atau sesuaikan geo) agar berita bahasa Inggris relevan
+    url = f"https://news.google.com/rss/search?q={encoded}&hl=en-US&gl=US&ceid=US:en"
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         r = requests.get(url, headers=headers, timeout=15)
@@ -137,8 +178,8 @@ def clean_text(text):
 
 def download_and_optimize_image(query, filename):
     if not filename.endswith(".webp"): filename = filename.rsplit(".", 1)[0] + ".webp"
-    # Prompt dinamis
-    safe_prompt = f"{query} football match action, stadium atmosphere, 8k resolution, photorealistic, sharp focus".replace(" ", "%20")[:250]
+    # Prompt lebih spesifik
+    safe_prompt = f"{query} sports action photography, stadium atmosphere, 8k, realistic, sharp focus".replace(" ", "%20")[:250]
     
     print(f"      🎨 Generating Image for: {query[:20]}...")
     for _ in range(2):
@@ -149,10 +190,8 @@ def download_and_optimize_image(query, filename):
             if r.status_code == 200 and "image" in r.headers.get("content-type", ""):
                 img = Image.open(BytesIO(r.content)).convert("RGB")
                 img = img.resize((1200, 675), Image.Resampling.LANCZOS)
-                
                 enhancer = ImageEnhance.Sharpness(img)
                 img = enhancer.enhance(1.3)
-                
                 img.save(f"{IMAGE_DIR}/{filename}", "WEBP", quality=75)
                 return f"/images/{filename}"
         except: time.sleep(2)
@@ -160,7 +199,6 @@ def download_and_optimize_image(query, filename):
 
 # --- INDEXING ---
 def submit_to_indexers(url):
-    # IndexNow
     try:
         ep = "https://api.indexnow.org/indexnow"
         host = WEBSITE_URL.replace("https://", "").replace("http://", "")
@@ -168,7 +206,6 @@ def submit_to_indexers(url):
         print(f"      🚀 IndexNow Submitted")
     except: pass
     
-    # Google Indexing
     if GOOGLE_JSON_KEY:
         try:
             creds = ServiceAccountCredentials.from_json_keyfile_dict(json.loads(GOOGLE_JSON_KEY), ["https://www.googleapis.com/auth/indexing"])
@@ -180,16 +217,16 @@ def submit_to_indexers(url):
 # --- AI WRITER ---
 def generate_article(title, summary, link, author, trend_origin):
     system_prompt = f"""
-    You are {author}, an international sports correspondent for 'Sport Daily'.
-    TOPIC: Trending Football News (Origin: {trend_origin}).
+    You are {author}, a professional sports journalist.
+    TOPIC: {title} (Trending in {trend_origin}).
     
-    GOAL: Write a 1000-word viral article.
+    GOAL: Write a 1000-word engaging article.
     
     OUTPUT JSON:
     {{
-        "title": "Headline (Engaging, Max 60 chars)",
-        "description": "Meta description (SEO Optimized)",
-        "category": "Trending News",
+        "title": "Headline (Max 60 chars, Clickworthy)",
+        "description": "Meta description",
+        "category": "Sports News",
         "main_keyword": "Focus Keyword",
         "lsi_keywords": ["key1", "key2"],
         "image_alt": "Alt text description"
@@ -198,16 +235,17 @@ def generate_article(title, summary, link, author, trend_origin):
     [Markdown Content]
     
     STRUCTURE:
-    - Executive Summary (Bold).
-    - Detailed Analysis (Unique H2).
-    - Statistical Data Table (Unique H2).
-    - Reaction & Quotes (Unique H2).
-    - Conclusion (Unique H2).
+    - **Dateline** (e.g., {trend_origin} - ).
+    - **Executive Summary** (Italicized, 50 words, Unique H2).
+    - **Match/Event Analysis** (Unique H2).
+    - **Key Stats/Table** (Markdown Table).
+    - **Quotes & Reactions** (Unique H2).
+    - **Conclusion** (Unique H2).
     - ### Read More (Block at the end):
     {get_formatted_internal_links()}
     """
     
-    user_prompt = f"Trend: {title}\nContext: {summary}\nLink: {link}\nWrite now."
+    user_prompt = f"Write about: {title}\nDetails: {summary}\nLink: {link}"
     
     for api_key in GROQ_API_KEYS:
         client = Groq(api_key=api_key)
@@ -236,10 +274,7 @@ def process_and_save(data_raw, original_title, original_link, author, keyword_im
             print("      ⚠️ Duplicate content detected. Skipping.")
             return False
         
-        # Image Generation
         img_url = download_and_optimize_image(keyword_img, f"{slug}.webp")
-        
-        # Metadata
         date = datetime.now().strftime("%Y-%m-%dT%H:%M:%S+00:00")
         tags = json.dumps(data.get('lsi_keywords', []))
         
@@ -260,7 +295,7 @@ draft: false
 {data['content']}
 
 ---
-*Source: Global Trending Analysis ({origin_country}) by {author} based on [Original Report]({original_link}).*
+*Source: Trending Analysis ({origin_country}) by {author}.*
 """
         with open(f"{CONTENT_DIR}/{filename}", "w", encoding="utf-8") as f: f.write(md)
         save_link_to_memory(data.get('title'), slug)
@@ -272,46 +307,40 @@ draft: false
         print(f"   ⚠️ Parsing Error: {e}")
         return False
 
-# --- MAIN LOGIC (MULTI-GEO) ---
+# --- MAIN LOGIC (MULTI-GEO + CATEGORY FILTER) ---
 def main():
     os.makedirs(CONTENT_DIR, exist_ok=True)
     os.makedirs(IMAGE_DIR, exist_ok=True)
     os.makedirs(DATA_DIR, exist_ok=True)
     
     generated_count = 0
-    seen_trends = set() # Untuk mencegah duplikasi antar negara (misal "Messi" trending di GB dan US)
+    seen_trends = set() 
     
-    print("\n🔥 STARTING MULTI-GEO TRENDS AUTOMATION 🔥")
-    print(f"🎯 Target: {TARGET_TOTAL_ARTICLES} articles. Priority: {TARGET_GEOS}")
+    print("\n🔥 STARTING SPORTS TRENDS AUTOMATION (Corrected) 🔥")
+    print(f"🎯 Target: {TARGET_TOTAL_ARTICLES} articles.")
     
-    # LOOP UTAMA: Pindah Negara jika kuota belum penuh
+    # LOOP NEGARA
     for geo_code in TARGET_GEOS:
-        if generated_count >= TARGET_TOTAL_ARTICLES:
-            break # Stop jika target sudah terpenuhi
+        if generated_count >= TARGET_TOTAL_ARTICLES: break
             
         print(f"\n🌍 Switching to Region: {geo_code}...")
-        
         trends = fetch_google_trends(geo=geo_code)
         
         if not trends:
-            print(f"   ⚠️ No sport trends found in {geo_code}. Trying next region...")
+            print(f"   ⚠️ No sports data in {geo_code}. Trying next...")
             continue
-            
-        print(f"   💎 Found {len(trends)} potential candidates in {geo_code}.")
         
-        # LOOP TREND: Proses setiap trend dalam negara tersebut
+        # PROSES SETIAP TREND
         for trend_keyword in trends:
             if generated_count >= TARGET_TOTAL_ARTICLES: break
             
-            # Cek apakah trend ini sudah diproses di negara sebelumnya?
-            if trend_keyword.lower() in seen_trends:
-                continue
-                
+            # Normalisasi untuk cek duplikat (misal: "Villarreal" di US dan GB)
+            if trend_keyword.lower() in seen_trends: continue
             seen_trends.add(trend_keyword.lower())
             
             print(f"\n   🔍 Processing: {trend_keyword} ({geo_code})")
             
-            # Cari berita pendukung (News Context)
+            # Cari Berita
             news_context = fetch_news_context(trend_keyword)
             if not news_context:
                 print("      ❌ No detailed news found. Skipping.")
@@ -319,35 +348,18 @@ def main():
                 
             author = random.choice(AUTHOR_PROFILES)
             
-            # Generate Artikel
-            raw_ai = generate_article(
-                news_context.title, 
-                news_context.summary, 
-                news_context.link, 
-                author,
-                trend_origin=geo_code
-            )
+            # Tulis Artikel
+            raw_ai = generate_article(news_context.title, news_context.summary, news_context.link, author, trend_origin=geo_code)
             
             if not raw_ai: continue
             
             # Simpan
-            success = process_and_save(
-                raw_ai, 
-                news_context.title, 
-                news_context.link, 
-                author, 
-                trend_keyword, # Gunakan keyword asli untuk gambar
-                origin_country=geo_code
-            )
-            
+            success = process_and_save(raw_ai, news_context.title, news_context.link, author, trend_keyword, origin_country=geo_code)
             if success:
                 generated_count += 1
-                time.sleep(5) # Jeda sopan
+                time.sleep(5) 
                 
-    # LAPORAN AKHIR
-    print(f"\n🎉 DONE! Generated {generated_count}/{TARGET_TOTAL_ARTICLES} articles from {len(seen_trends)} trends scanned.")
-    if generated_count < TARGET_TOTAL_ARTICLES:
-        print("⚠️ Note: Exhausted all regions but could not fill the target.")
+    print(f"\n🎉 DONE! Generated {generated_count}/{TARGET_TOTAL_ARTICLES} articles.")
 
 if __name__ == "__main__":
     main()
