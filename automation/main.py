@@ -35,47 +35,35 @@ if not GROQ_API_KEYS:
 AUTHOR_PROFILES = [
     "Dave Harsya (Senior Analyst)", "Sarah Jenkins (Chief Editor)", 
     "Luca Romano (Transfer Specialist)", "Marcus Reynolds (PL Correspondent)", 
-    "Elena Petrova (Tactical Expert)", "Ben Foster (Sports Journalist)"
+    "Ben Foster (Sports Journalist)"
 ]
 
-# --- TARGET GEOS (URUTAN PRIORITAS) ---
-# Bot akan mengecek tab SPORTS di negara-negara ini secara berurutan
-# US ditaruh awal karena screenshot Anda menunjukkan US sedang ramai
+# --- TARGET GEOS ---
 TARGET_GEOS = ["US", "GB", "NG", "ZA", "IE", "AU", "ES", "IT", "BR"]
 
-# --- AUTHORITY SOURCES ---
-AUTHORITY_SOURCES = [
-    "Transfermarkt", "Sky Sports", "The Athletic", "Opta Analyst",
-    "WhoScored", "BBC Sport", "The Guardian", "UEFA Official", "ESPN FC"
-]
-
-# --- FALLBACK IMAGES ---
-FALLBACK_IMAGES = [
-    "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80",
-    "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?auto=format&fit=crop&w=1200&q=80"
-]
-
+# --- CONTENT CONFIG ---
 CONTENT_DIR = "content/articles"
 IMAGE_DIR = "static/images"
 DATA_DIR = "automation/data"
 MEMORY_FILE = f"{DATA_DIR}/link_memory.json"
-
 TARGET_TOTAL_ARTICLES = 5 
 
-# --- MASSIVE KEYWORD DATABASE ---
-# Berfungsi menangkap judul seperti "Villarreal - Real Madrid" yang tidak ada kata "Football"-nya
+# --- BROWSER HEADERS (PENYAMARAN) ---
+# Ini wajib agar tidak diblokir Google
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0"
+]
+
+# --- MASSIVE KEYWORD DATABASE (FILTER) ---
 SPORTS_KEYWORDS = [
-    # GENERAL TERMS
     "football", "soccer", "sport", "league", "cup", "game", "match", "vs", "score",
     "result", "highlights", "table", "fixture", "transfer", "injury", "manager",
     "ufc", "mma", "nba", "basketball", "nfl", "f1", "formula 1", "moto gp", "boxing",
-    
-    # LEAGUES & EVENTS
     "premier league", "champions league", "europa", "la liga", "serie a", "bundesliga", 
     "ligue 1", "mls", "fifa", "uefa", "fa cup", "carabao", "copa america", "euro 2024", 
     "world cup", "afcon", "libertadores", "super bowl", "playoffs",
-    
-    # CLUBS (European Giants + EPL)
     "arsenal", "aston villa", "bournemouth", "brentford", "brighton", "chelsea",
     "crystal palace", "everton", "fulham", "liverpool", "luton", "man city", 
     "manchester city", "man utd", "manchester united", "newcastle", "nottingham",
@@ -84,12 +72,16 @@ SPORTS_KEYWORDS = [
     "bayern", "dortmund", "leverkusen", "juventus", "milan", "inter", "roma", "napoli", 
     "psg", "ajax", "benfica", "porto", "sporting", "celtic", "rangers", "miami", 
     "al nassr", "al hilal", "knicks", "76ers", "lakers", "warriors", "chiefs", "49ers",
-    
-    # PLAYERS & FIGHTERS (Visible in your screenshot)
     "paddy pimblett", "pimblett", "mcgregor", "jon jones", "ngannou",
     "messi", "ronaldo", "mbappe", "haaland", "bellingham", "kane", "salah", "debruyne",
     "saka", "rice", "foden", "vinicius", "rodrygo", "yamal", "lewandowski", "neymar",
     "mike mccarthy", "dak prescott", "lebron", "curry"
+]
+
+# --- FALLBACK IMAGES ---
+FALLBACK_IMAGES = [
+    "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?auto=format&fit=crop&w=1200&q=80"
 ]
 
 # --- MEMORY SYSTEM ---
@@ -113,57 +105,78 @@ def get_formatted_internal_links():
     if len(items) > 3: items = random.sample(items, 3)
     return "\n".join([f"* [{t}]({u})" for t, u in items])
 
-# --- FETCHERS ---
+# --- CRITICAL UPDATE: ROBUST TRENDS FETCHER ---
 def fetch_google_trends(geo="US"):
     """
-    Mengambil RSS khusus kategori SPORTS (cat=s).
-    Ini sesuai dengan screenshot dropdown 'Sports' Anda.
+    Mengambil RSS dengan header browser asli agar tidak diblokir.
+    Menggunakan strategi 'Double Tap': Coba Sports -> Jika gagal, Coba General + Filter.
     """
-    # PERHATIKAN: &cat=s adalah kuncinya!
-    rss_url = f"https://trends.google.com/trends/trendingsearches/daily/rss?geo={geo}&cat=s"
-    print(f"   📡 Scanning Google Trends (Category: Sports) Region: {geo}...")
     
-    try:
-        feed = feedparser.parse(rss_url)
-        trends = []
-        
-        # DEBUG: Lihat apa yang ditemukan Google
-        if feed.entries:
-            # Ambil 3 teratas untuk pengecekan di terminal
-            top_3 = [e.title for e in feed.entries[:3]]
-            print(f"      [DEBUG] Top 3 Sports in {geo}: {top_3}")
-        else:
-            print(f"      [WARNING] Feed kosong atau diblokir di {geo}.")
+    # 1. URL Target
+    url_sports = f"https://trends.google.com/trends/trendingsearches/daily/rss?geo={geo}&cat=s"
+    url_general = f"https://trends.google.com/trends/trendingsearches/daily/rss?geo={geo}"
+    
+    headers = {
+        'User-Agent': random.choice(USER_AGENTS),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+    }
 
-        if feed.entries:
-            for entry in feed.entries:
-                title_lower = entry.title.lower()
-                
-                # Filter Keyword (Opsional, tapi bagus untuk memastikan relevansi)
-                # Karena kita sudah pakai cat=s, harusnya isinya sudah olahraga semua.
-                # Tapi kita cek lagi agar 'safe'.
-                if any(k in title_lower for k in SPORTS_KEYWORDS):
-                    trends.append(entry.title)
-                else:
-                    # Jika judulnya aneh tapi masuk kategori sports, kita masukkan juga
-                    # tapi beri log
-                    print(f"      ❓ Found potential sport trend (checking content later): {entry.title}")
-                    trends.append(entry.title)
-                    
-        return trends
-    except Exception as e: 
-        print(f"      [ERROR] Feed Parse Error: {e}")
-        return []
+    def get_feed_entries(target_url):
+        try:
+            print(f"      📡 Requesting: {target_url} ...")
+            # REQUEST PENTING: Gunakan requests.get DULUAN, bukan feedparser langsung
+            resp = requests.get(target_url, headers=headers, timeout=10)
+            
+            if resp.status_code != 200:
+                print(f"      ⚠️ Status Code: {resp.status_code} (Blocked/Error)")
+                return []
+            
+            # Parsing konten text dari requests
+            feed = feedparser.parse(resp.content)
+            return feed.entries if feed.entries else []
+        except Exception as e:
+            print(f"      ❌ Connection Error: {e}")
+            return []
+
+    # --- STRATEGI 1: Coba Kategori Sports Langsung ---
+    print(f"   🔎 [Attempt 1] Scanning 'Sports' Category in {geo}...")
+    entries = get_feed_entries(url_sports)
+    
+    final_trends = []
+
+    if entries:
+        print(f"      ✅ Sports Feed Found! ({len(entries)} items)")
+        # Ambil semua karena ini sudah pasti folder sports
+        final_trends = [e.title for e in entries]
+    else:
+        # --- STRATEGI 2: Fallback ke General & Filter Manual ---
+        print(f"      ⚠️ Sports feed empty via API. Switching to [Attempt 2] General Feed + Filter...")
+        entries = get_feed_entries(url_general)
+        
+        if entries:
+            print(f"      ✅ General Feed Found ({len(entries)} items). Filtering for sports...")
+            for e in entries:
+                # Debug: Tampilkan apa yang sedang dicek
+                # print(f"         Checking: {e.title}") 
+                if any(k in e.title.lower() for k in SPORTS_KEYWORDS):
+                    print(f"         🎯 MATCH FOUND: {e.title}")
+                    final_trends.append(e.title)
+    
+    return final_trends
 
 def fetch_news_context(keyword):
     """
     Mencari konteks berita di Google News Global
     """
     encoded = requests.utils.quote(f"{keyword} news")
-    # Menggunakan gl=US (atau sesuaikan geo) agar berita bahasa Inggris relevan
     url = f"https://news.google.com/rss/search?q={encoded}&hl=en-US&gl=US&ceid=US:en"
+    
+    headers = {'User-Agent': random.choice(USER_AGENTS)} # Pakai header acak juga di sini
+    
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         r = requests.get(url, headers=headers, timeout=15)
         if r.status_code == 200:
             feed = feedparser.parse(r.content)
@@ -178,7 +191,6 @@ def clean_text(text):
 
 def download_and_optimize_image(query, filename):
     if not filename.endswith(".webp"): filename = filename.rsplit(".", 1)[0] + ".webp"
-    # Prompt lebih spesifik
     safe_prompt = f"{query} sports action photography, stadium atmosphere, 8k, realistic, sharp focus".replace(" ", "%20")[:250]
     
     print(f"      🎨 Generating Image for: {query[:20]}...")
@@ -307,7 +319,7 @@ draft: false
         print(f"   ⚠️ Parsing Error: {e}")
         return False
 
-# --- MAIN LOGIC (MULTI-GEO + CATEGORY FILTER) ---
+# --- MAIN LOGIC ---
 def main():
     os.makedirs(CONTENT_DIR, exist_ok=True)
     os.makedirs(IMAGE_DIR, exist_ok=True)
@@ -316,10 +328,9 @@ def main():
     generated_count = 0
     seen_trends = set() 
     
-    print("\n🔥 STARTING SPORTS TRENDS AUTOMATION (Corrected) 🔥")
+    print("\n🔥 STARTING SPORTS TRENDS AUTOMATION (UNBLOCKED VERSION) 🔥")
     print(f"🎯 Target: {TARGET_TOTAL_ARTICLES} articles.")
     
-    # LOOP NEGARA
     for geo_code in TARGET_GEOS:
         if generated_count >= TARGET_TOTAL_ARTICLES: break
             
@@ -327,33 +338,26 @@ def main():
         trends = fetch_google_trends(geo=geo_code)
         
         if not trends:
-            print(f"   ⚠️ No sports data in {geo_code}. Trying next...")
+            print(f"   ⚠️ No valid sport trends found in {geo_code} after all attempts.")
             continue
         
-        # PROSES SETIAP TREND
         for trend_keyword in trends:
             if generated_count >= TARGET_TOTAL_ARTICLES: break
             
-            # Normalisasi untuk cek duplikat (misal: "Villarreal" di US dan GB)
             if trend_keyword.lower() in seen_trends: continue
             seen_trends.add(trend_keyword.lower())
             
             print(f"\n   🔍 Processing: {trend_keyword} ({geo_code})")
-            
-            # Cari Berita
             news_context = fetch_news_context(trend_keyword)
             if not news_context:
                 print("      ❌ No detailed news found. Skipping.")
                 continue
                 
             author = random.choice(AUTHOR_PROFILES)
-            
-            # Tulis Artikel
             raw_ai = generate_article(news_context.title, news_context.summary, news_context.link, author, trend_origin=geo_code)
             
             if not raw_ai: continue
             
-            # Simpan
             success = process_and_save(raw_ai, news_context.title, news_context.link, author, trend_keyword, origin_country=geo_code)
             if success:
                 generated_count += 1
